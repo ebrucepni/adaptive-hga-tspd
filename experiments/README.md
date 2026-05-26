@@ -7,6 +7,7 @@ The `experiments` directory contains source files for recording and summarizing 
 ```text
 benchmark_logger.cpp          # CSV logger included by src/main.cpp
 benchmark_statistics.cpp      # Standalone summary generator source
+operator_analysis.cpp         # Standalone adaptive operator analysis runner
 results/                      # Local output directory, generated when runs are executed
 ```
 
@@ -80,7 +81,39 @@ The summary columns are:
 instance,min_AHGA,avg_AHGA,avg_TAHGA,runs
 ```
 
-Both CSV files are generated outputs and should not be committed.
+These benchmark result CSV files are generated outputs and are usually kept local.
+
+## Operator Selection Analysis
+
+`operator_analysis.cpp` is a separate experiment mode for inspecting adaptive
+local search operator behavior without rerunning the full benchmark suite. It
+keeps the normal AHGA flow intact and writes to a separate CSV instead of
+`results.csv`.
+
+Compile it from the project root without `src/main.cpp`:
+
+```bash
+g++ -std=c++17 -O3 src/adaptive_operator.cpp src/benchmark_loader.cpp src/distance.cpp src/drone.cpp src/fitness.cpp src/genetic_algorithm.cpp src/local_search.cpp src/population.cpp src/runner.cpp src/utils.cpp experiments/operator_analysis.cpp -o operator_analysis
+```
+
+Run:
+
+```bash
+./operator_analysis
+```
+
+The runner uses the representative instances `mbB101`, `mbC106`, `mbD110`,
+`mbE101`, `mbF105`, and `mbG110` with seeds `1`, `2`, and `3`. For each local
+search operator it records selection count, improvement count, non-improvement
+count, success rate, final adaptive score, and final selection probability.
+
+The output is appended to:
+
+```text
+experiments/results/operator_analysis.csv
+```
+
+This operator analysis CSV can be committed when it is used as report data.
 
 ## Notes
 

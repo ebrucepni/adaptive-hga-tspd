@@ -56,6 +56,13 @@ Build the experiment summary executable:
 g++ -std=c++17 -O3 experiments/benchmark_statistics.cpp -o benchmark_statistics
 ```
 
+Build the operator analysis executable. This excludes `src/main.cpp` because
+`experiments/operator_analysis.cpp` has its own `main()`:
+
+```bash
+g++ -std=c++17 -O3 src/adaptive_operator.cpp src/benchmark_loader.cpp src/distance.cpp src/drone.cpp src/fitness.cpp src/genetic_algorithm.cpp src/local_search.cpp src/population.cpp src/runner.cpp src/utils.cpp experiments/operator_analysis.cpp -o operator_analysis
+```
+
 ## Run
 
 Run the algorithm with the default benchmark:
@@ -94,6 +101,34 @@ The summary is written locally to:
 
 ```text
 experiments/results/summary_result.csv
+```
+
+## Operator Selection Analysis
+
+For the report's Adaptive Operator Behavior Analysis section, a separate
+experiment mode is provided in `experiments/operator_analysis.cpp`. It does not
+replace the normal AHGA benchmark flow and does not write to
+`experiments/results/results.csv`.
+
+This mode runs only a small representative set of instances:
+
+```text
+mbB101, mbC106, mbD110, mbE101, mbF105, mbG110
+```
+
+Each instance is run with seeds `1`, `2`, and `3`. During adaptive local search,
+the experiment records how often each operator is selected, how often it
+improves the same cost value used by the adaptive score update, and the final
+operator score/probability. Results are appended to:
+
+```text
+experiments/results/operator_analysis.csv
+```
+
+Run it with:
+
+```bash
+./operator_analysis
 ```
 
 ## Benchmark Format

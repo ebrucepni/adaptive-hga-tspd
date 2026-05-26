@@ -114,6 +114,14 @@ struct Individual {
     double biased_fitness = 0.0;
 };
 
+struct OperatorStats {
+    int selected_count = 0;
+    int improved_count = 0;
+    int not_improved_count = 0;
+    double final_score = 0.0;
+    double final_probability = 0.0;
+};
+
 struct RunResult {
     Benchmark benchmark;
     optional<Individual> best_individual;
@@ -128,6 +136,7 @@ struct RunResult {
     int infeasible_solutions_generated = 0;
     double final_penalty = 0.0;
     map<string, double> operator_scores;
+    map<string, OperatorStats> operator_stats;
 };
 
 string trim(const string& text);
@@ -202,12 +211,12 @@ string select_operator_adaptively(const map<string, double>& scores);
 map<string, double> update_operator_score(map<string, double> scores, const string& selected, bool improved);
 
 Individual create_individual(const vector<int>& route, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty_coefficient);
-Individual create_educated_individual(const vector<int>& route, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty_coefficient, map<string, double>& operator_scores);
+Individual create_educated_individual(const vector<int>& route, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty_coefficient, map<string, double>& operator_scores, map<string, OperatorStats>* operator_stats = nullptr);
 double normalized_hamming_distance(const vector<int>& a, const vector<int>& b);
 void update_biased_fitness(vector<Individual>& population, int nb_elite = NB_ELITE, double nclose_ratio = NCLOSE);
 Individual tournament_selection(const vector<Individual>& population, int tournament_size = 2);
 vector<int> dx_crossover(const Individual& p1, const Individual& p2);
-pair<Individual, optional<Individual>> create_offspring_ahga(const vector<Individual>& complete_population, const map<int, map<int, double>>& dist, map<string, double>& operator_scores, const Benchmark& instance, double penalty_coefficient);
+pair<Individual, optional<Individual>> create_offspring_ahga(const vector<Individual>& complete_population, const map<int, map<int, double>>& dist, map<string, double>& operator_scores, const Benchmark& instance, double penalty_coefficient, map<string, OperatorStats>* operator_stats = nullptr);
 vector<Individual> remove_clones(vector<Individual> population);
 vector<Individual> select_survivors(vector<Individual> population, int target_size, int nb_elite = NB_ELITE);
 double update_penalty_coefficient(const vector<Individual>& feasible, const vector<Individual>& infeasible, double penalty);
@@ -216,12 +225,13 @@ vector<Individual> build_individuals(const vector<vector<int>>& routes, const Be
 pair<vector<Individual>, vector<Individual>> split_by_feasibility(const vector<Individual>& individuals);
 pair<vector<Individual>, vector<Individual>> trim_population(vector<Individual> feasible, vector<Individual> infeasible);
 vector<Individual> initialize_individuals(const vector<int>& customers, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty);
-pair<vector<Individual>, vector<Individual>> diversify_population(vector<Individual> complete, const vector<int>& customers, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty, map<string, double>& operator_scores);
+pair<vector<Individual>, vector<Individual>> diversify_population(vector<Individual> complete, const vector<int>& customers, const map<int, map<int, double>>& dist, const Benchmark& instance, double penalty, map<string, double>& operator_scores, map<string, OperatorStats>* operator_stats = nullptr);
 void add_child_to_population(const Individual& child, const optional<Individual>& repaired, vector<Individual>& feasible, vector<Individual>& infeasible);
 double to_minutes(double time_value, const string& unit);
 double individual_min_time(const Individual& ind);
 optional<Individual> best_feasible_individual(const vector<Individual>& feasible);
 RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed = nullopt, bool verbose = false);
+RunResult run_ahga_with_operator_stats(const string& benchmark_file, optional<unsigned int> seed = nullopt, bool verbose = false);
 
 void print_section(const string& title);
 void print_vector(const vector<int>& values);

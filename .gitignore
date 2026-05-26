@@ -1,15 +1,16 @@
 # Build outputs
 ahga_tspd
 benchmark_statistics
+operator_analysis
 *.o
 *.out
 build/
 
-# Experiment outputs generated locally
+# Benchmark data stored locally
 benchmarks/*.txt
 
-# OS/editor files
+# Local environments and OS/editor files
+.venv/
 .DS_Store
 *.swp
 *.swo
-

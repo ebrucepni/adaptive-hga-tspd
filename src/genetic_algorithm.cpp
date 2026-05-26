@@ -56,7 +56,8 @@ Solution educate_solution_ahga(Solution current,
                                const map<int, map<int, double>>& dist,
                                map<string, double>& operator_scores,
                                const Benchmark& instance,
-                               double penalty_coefficient) {
+                               double penalty_coefficient,
+                               map<string, OperatorStats>* operator_stats = nullptr) {
     bool improvement_found = true;
     int round = 0;
 
@@ -64,6 +65,9 @@ Solution educate_solution_ahga(Solution current,
         improvement_found = false;
 
         string selected_operator = select_operator_adaptively(operator_scores);
+        if (operator_stats) {
+            (*operator_stats)[selected_operator].selected_count++;
+        }
         double old_cost = evaluate_solution(current, dist, instance.drone_endurance, penalty_coefficient);
 
         Solution candidate = apply_local_search_operator(
@@ -84,9 +88,15 @@ Solution educate_solution_ahga(Solution current,
         if (candidate_cost < old_cost) {
             current = candidate;
             operator_scores = update_operator_score(operator_scores, selected_operator, true);
+            if (operator_stats) {
+                (*operator_stats)[selected_operator].improved_count++;
+            }
             improvement_found = true;
         } else {
             operator_scores = update_operator_score(operator_scores, selected_operator, false);
+            if (operator_stats) {
+                (*operator_stats)[selected_operator].not_improved_count++;
+            }
         }
 
         ++round;
@@ -102,7 +112,8 @@ Solution educate_solution_ahga(Solution current,
 
 Individual create_educated_individual(const vector<int>& route, const map<int, map<int, double>>& dist,
                                       const Benchmark& instance, double penalty_coefficient,
-                                      map<string, double>& operator_scores) {
+                                      map<string, double>& operator_scores,
+                                      map<string, OperatorStats>* operator_stats) {
     Solution solution = split_route_to_tspd_solution(route, dist, instance.drone_endurance, instance.truck_speed,
                                                      instance.drone_speed, instance.launch_time, instance.retrieve_time,
                                                      instance.drone_eligible_customers, penalty_coefficient);
@@ -110,7 +121,7 @@ Individual create_educated_individual(const vector<int>& route, const map<int, m
                                           instance.launch_time, instance.retrieve_time, OBJECTIVE,
                                           TRUCK_COST_COEFF, DRONE_COST_COEFF, WAIT_TRUCK_COEFF, WAIT_DRONE_COEFF,
                                           instance.drone_eligible_customers);
-    solution = educate_solution_ahga(solution, dist, operator_scores, instance, penalty_coefficient);
+    solution = educate_solution_ahga(solution, dist, operator_scores, instance, penalty_coefficient, operator_stats);
     double cost = evaluate_solution(solution, dist, instance.drone_endurance, penalty_coefficient);
     return {solution.giant_tour, solution, cost};
 }
@@ -226,7 +237,8 @@ pair<Individual, optional<Individual>> create_offspring_ahga(const vector<Indivi
                                                              const map<int, map<int, double>>& dist,
                                                              map<string, double>& operator_scores,
                                                              const Benchmark& instance,
-                                                             double penalty_coefficient) {
+                                                             double penalty_coefficient,
+                                                             map<string, OperatorStats>* operator_stats) {
     Individual parent1 = tournament_selection(complete_population);
     Individual parent2 = tournament_selection(complete_population);
     vector<int> child_route = dx_crossover(parent1, parent2);
@@ -239,7 +251,7 @@ pair<Individual, optional<Individual>> create_offspring_ahga(const vector<Indivi
                                                 OBJECTIVE, TRUCK_COST_COEFF, DRONE_COST_COEFF,
                                                 WAIT_TRUCK_COEFF, WAIT_DRONE_COEFF,
                                                 instance.drone_eligible_customers);
-    Solution current = educate_solution_ahga(child_solution, dist, operator_scores, instance, penalty_coefficient);
+    Solution current = educate_solution_ahga(child_solution, dist, operator_scores, instance, penalty_coefficient, operator_stats);
     double new_cost = evaluate_solution(current, dist, instance.drone_endurance, penalty_coefficient);
     Individual child{current.giant_tour, current, new_cost};
 

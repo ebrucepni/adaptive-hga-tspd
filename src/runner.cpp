@@ -37,14 +37,15 @@ vector<Individual> initialize_individuals(const vector<int>& customers, const ma
 pair<vector<Individual>, vector<Individual>> diversify_population(vector<Individual> complete, const vector<int>& customers,
                                                                   const map<int, map<int, double>>& dist,
                                                                   const Benchmark& instance, double penalty,
-                                                                  map<string, double>& operator_scores) {
+                                                                  map<string, double>& operator_scores,
+                                                                  map<string, OperatorStats>* operator_stats) {
     int keep_count = max(1, MU / 3);
     update_biased_fitness(complete);
     sort(complete.begin(), complete.end(), [](const auto& a, const auto& b) { return a.biased_fitness < b.biased_fitness; });
     vector<Individual> combined(complete.begin(), complete.begin() + min(keep_count, static_cast<int>(complete.size())));
     vector<vector<int>> fresh_routes = initialize_population(customers, dist, 4 * MU, K_CHEAPEST);
     for (const auto& route : fresh_routes) {
-        combined.push_back(create_educated_individual(route, dist, instance, penalty, operator_scores));
+        combined.push_back(create_educated_individual(route, dist, instance, penalty, operator_scores, operator_stats));
     }
     auto [feasible, infeasible] = split_by_feasibility(combined);
     return {select_survivors(feasible, MU), select_survivors(infeasible, MU)};
@@ -79,7 +80,29 @@ optional<Individual> best_feasible_individual(const vector<Individual>& feasible
     });
 }
 
-RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bool verbose) {
+namespace {
+
+map<string, OperatorStats> initialize_operator_stats(const map<string, double>& operator_scores) {
+    map<string, OperatorStats> stats;
+    for (const auto& [name, score] : operator_scores) {
+        stats[name].final_score = score;
+    }
+    return stats;
+}
+
+void finalize_operator_stats(map<string, OperatorStats>& stats, const map<string, double>& operator_scores) {
+    double total_score = 0.0;
+    for (const auto& [_, score] : operator_scores) total_score += score;
+
+    for (const auto& [name, score] : operator_scores) {
+        auto& op_stats = stats[name];
+        op_stats.final_score = score;
+        op_stats.final_probability = total_score > 0.0 ? score / total_score : 0.0;
+    }
+}
+
+RunResult run_ahga_internal(const string& benchmark_file, optional<unsigned int> seed, bool verbose,
+                            bool collect_operator_stats) {
     if (seed) rng.seed(*seed);
     auto start = chrono::steady_clock::now();
     Benchmark instance = load_benchmark(benchmark_file.empty() ? BENCHMARK_FILE : benchmark_file);
@@ -96,6 +119,8 @@ RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bo
     Individual global_best_penalized = *min_element(complete.begin(), complete.end(), [](const auto& a, const auto& b) { return a.cost < b.cost; });
     optional<Individual> global_best_feasible = best_feasible_individual(feasible);
     auto operator_scores = initialize_operator_scores();
+    auto operator_stats = initialize_operator_stats(operator_scores);
+    auto* operator_stats_ptr = collect_operator_stats ? &operator_stats : nullptr;
 
     int iteration = 0;
     int without_improvement = 0;
@@ -108,7 +133,7 @@ RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bo
         complete.insert(complete.end(), infeasible.begin(), infeasible.end());
         if (complete.size() < 2) break;
         update_biased_fitness(complete);
-        auto [child, repaired] = create_offspring_ahga(complete, dist, operator_scores, instance, penalty);
+        auto [child, repaired] = create_offspring_ahga(complete, dist, operator_scores, instance, penalty, operator_stats_ptr);
         if (!child.solution.is_feasible) ++infeasible_solutions_generated;
         if (repaired && repaired->solution.is_feasible) ++repaired_solutions;
         add_child_to_population(child, repaired, feasible, infeasible);
@@ -138,7 +163,7 @@ RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bo
             ++no_improvement_for_diversification;
         }
         if (no_improvement_for_diversification >= ITER_DIV) {
-            tie(feasible, infeasible) = diversify_population(complete, instance.customers, dist, instance, penalty, operator_scores);
+            tie(feasible, infeasible) = diversify_population(complete, instance.customers, dist, instance, penalty, operator_scores, operator_stats_ptr);
             no_improvement_for_diversification = 0;
         }
         if (verbose) {
@@ -165,5 +190,19 @@ RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bo
     result.infeasible_solutions_generated = infeasible_solutions_generated;
     result.final_penalty = penalty;
     result.operator_scores = operator_scores;
+    if (collect_operator_stats) {
+        finalize_operator_stats(operator_stats, operator_scores);
+        result.operator_stats = operator_stats;
+    }
     return result;
+}
+
+}
+
+RunResult run_ahga(const string& benchmark_file, optional<unsigned int> seed, bool verbose) {
+    return run_ahga_internal(benchmark_file, seed, verbose, false);
+}
+
+RunResult run_ahga_with_operator_stats(const string& benchmark_file, optional<unsigned int> seed, bool verbose) {
+    return run_ahga_internal(benchmark_file, seed, verbose, true);
 }
