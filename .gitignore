@@ -1,0 +1,15 @@
+# Build outputs
+ahga_tspd
+benchmark_statistics
+*.o
+*.out
+build/
+
+# Experiment outputs generated locally
+benchmarks/*.txt
+
+# OS/editor files
+.DS_Store
+*.swp
+*.swo
+
